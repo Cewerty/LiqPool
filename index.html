@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+</head>
+<body>
+    <h1>Pool Interface</h1>
+    <div>
+        <p>Total Liquidity in pool: <span id="totalLiqudity"></span></p>
+        <p>First token liquidity: <span id="firstTokenLiqudity"></span></p>
+        <p>Second token liquidity: <span id="secondTokenLiqudity"></span></p>
+        <p>Your LP token balance: <span id="LpTokenBalance"></span></p>
+    </div>
+    <!-- Add Liquidity -->
+    <div>
+        <h2>Add Liquidity</h2>
+        <form id="AddLiqudityForm">
+        <label for="amountA">Amount Token A:</label>
+        <input type="number" id="amountA" placeholder="Enter amount A">
+        <label for="amountB">Amount Token B:</label>
+        <input type="number" id="amountB" placeholder="Enter amount B">
+        <button type="submit">Add Liquidity</button>
+        <!-- </form> -->
+    </div>
+
+    <!-- Remove Liquidity -->
+    <div>
+        <h2>Remove Liquidity</h2>
+        <form id="liquidityRemoveForm">
+        <label for="liquidityToRemove">Liquidity to Remove:</label>
+        <input type="number" id="liquidityToRemove" placeholder="Enter liquidity">
+        <button type="submit">Remove Liquidity</button>
+        </form>
+    </div>
+
+    <!-- Swap Tokens -->
+    <div>
+        <h2>Swap Tokens</h2>
+        <form id="SwapTokensForm">
+        <label for="amountIn">Amount In:</label>
+        <input type="number" id="amountIn" placeholder="Enter amount">
+        <label for="isTokenA">Is Token A Input:</label>
+        <input type="checkbox" id="isTokenA">
+        <button type="submit">Swap</button>
+        </form>
+    </div>
+    <script type="module" src="./src/main.js"></script>
+</body>
+</html>
