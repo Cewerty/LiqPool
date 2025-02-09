@@ -37,64 +37,34 @@ const SwapTokenForm = document.getElementById("SwapTokensForm");
 const SwapTokenAmount = document.getElementById("amountIn");
 const SwapTokenIsTokenA = document.getElementById("isTokenA");
 
-async function resetAndApprove(tokenContract, spender, amount) {
-    try {
-        // Reset allowance to 0
-        const resetTx = await tokenContract.approve(spender, 0, { gasLimit: 500000 });
-        await resetTx.wait();
-        console.log("Allowance reset to 0");
-
-        // Set new allowance
-        const approveTx = await tokenContract.approve(spender, amount, { gasLimit: 500000 });
-        const receipt = await approveTx.wait();
-        console.log("New allowance set:", receipt.status);
-
-        return true;
-    } catch (error) {
-        console.error("Error resetting/approving allowance:", error.message);
-        return false;
-    }
-}
-
-
 async function init() {
     try {
-      console.log("1. Инициализация...");
       
       if (!window.ethereum) throw new Error("Установите MetaMask");
-      
-    //   Принудительный сброс подключения (для теста)
-    //   await window.ethereum.request({ 
-    //     method: "wallet_requestPermissions",
-    //     params: [{ eth_accounts: {} }]
-    //   });
   
       provider = new BrowserProvider(window.ethereum);
-      console.log("2. Провайдер создан");
   
       const network = await provider.getNetwork();
-      console.log("3. Сеть:", network.chainId);
+      console.log("Сеть:", network.chainId);
   
       signer = await provider.getSigner();
-      console.log("4. Signer получен");
   
       user_address = await signer.getAddress();
-      console.log("5. Адрес пользователя:", user_address);
+      console.log("Адрес пользователя:", user_address);
   
       poolContract = new Contract(PoolAddress, poolABI, signer);
       LPTokenContract = new Contract(LPTokenAddress, tokensABI, signer);
       secondTokenContract = new Contract(SecondTokenAddress, tokensABI, signer);
       firstTokenContract = new Contract(firstTokenAddress, tokensABI, signer);
-      console.log("6. Контракт инициализирован");
   
     const totalLiq = await poolContract.totalLiquidity({gasLimit: 1_000_000});
     const reserveTokenA = await poolContract.tokenAReserve();
      const reserveTokenB = await poolContract.tokenBReserve();
     const LpBalance = await LPTokenContract.balanceOf(user_address);
   
-    totalLiquidity.innerText = totalLiq;
-    firstTokenLiquidity.innerText = reserveTokenA;
-    secondTokenLiquidity.innerText = reserveTokenB;
+    totalLiquidity.innerText = formatUnits(totalLiq, 18);
+    firstTokenLiquidity.innerText = formatUnits(reserveTokenA, 18);
+    secondTokenLiquidity.innerText = formatUnits(reserveTokenB, 18);
     LPTokenLiquidity.innerText = formatUnits(LpBalance, 18);
       
     } catch (error) {
@@ -129,8 +99,6 @@ AddLiquidityForm.addEventListener("submit", async (event) => {
             firstTokenContract.balanceOf(user_address),
             secondTokenContract.balanceOf(user_address)
         ]);
-
-        console.log(formatUnits(balanceA, 18), formatUnits(balanceB, 18));
         
         if (balanceA < tokenAAmountBN) {
             throw new Error(`Недостаточно токенов A (баланс: ${formatUnits(balanceA, 18)})`);
