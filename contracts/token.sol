@@ -57,7 +57,7 @@ contract Token is IERC20 {
         uint256 _amount
     ) external override returns (bool success) {
         require(balances[_from] >= _amount, "You can't send more tokens than user have");
-        require(allowances[msg.sender][_from] >= _amount, "Token amount exceed allowance");
+        require(allowances[_from][msg.sender] >= _amount, "Token amount exceed allowance");
 
         balances[_from] -= _amount;
         balances[_to] += _amount;

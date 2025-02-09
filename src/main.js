@@ -1,5 +1,4 @@
 import { BrowserProvider, formatUnits, Contract, parseUnits } from 'ethers';
-// import { BrowserProvider, Contract, parseUnits, formatUnits } from 'https://cdnjs.cloudflare.com/ajax/libs/ethers/6.7.0/ethers.min.js';
 import TokenABI from '../artifacts/contracts/token.sol/Token.json' with {type:'json'};
 import PoolABI from '../artifacts/contracts/pool.sol/Pool.json' with {type:'json'};
 
@@ -38,6 +37,25 @@ const SwapTokenForm = document.getElementById("SwapTokensForm");
 const SwapTokenAmount = document.getElementById("amountIn");
 const SwapTokenIsTokenA = document.getElementById("isTokenA");
 
+async function resetAndApprove(tokenContract, spender, amount) {
+    try {
+        // Reset allowance to 0
+        const resetTx = await tokenContract.approve(spender, 0, { gasLimit: 500000 });
+        await resetTx.wait();
+        console.log("Allowance reset to 0");
+
+        // Set new allowance
+        const approveTx = await tokenContract.approve(spender, amount, { gasLimit: 500000 });
+        const receipt = await approveTx.wait();
+        console.log("New allowance set:", receipt.status);
+
+        return true;
+    } catch (error) {
+        console.error("Error resetting/approving allowance:", error.message);
+        return false;
+    }
+}
+
 
 async function init() {
     try {
@@ -45,7 +63,7 @@ async function init() {
       
       if (!window.ethereum) throw new Error("Установите MetaMask");
       
-      // Принудительный сброс подключения (для теста)
+    //   Принудительный сброс подключения (для теста)
     //   await window.ethereum.request({ 
     //     method: "wallet_requestPermissions",
     //     params: [{ eth_accounts: {} }]
@@ -71,7 +89,7 @@ async function init() {
   
     const totalLiq = await poolContract.totalLiquidity({gasLimit: 1_000_000});
     const reserveTokenA = await poolContract.tokenAReserve();
-    const reserveTokenB = await poolContract.tokenBReserve();
+     const reserveTokenB = await poolContract.tokenBReserve();
     const LpBalance = await LPTokenContract.balanceOf(user_address);
   
     totalLiquidity.innerText = totalLiq;
@@ -94,74 +112,111 @@ AddLiquidityForm.addEventListener("submit", async (event) => {
     event.preventDefault();
     
     try {
-        // 1. Получаем значения
+        // 1. Получаем и валидируем входные значения
         const tokenAAmount = AddLiquidityTokenA.value.trim();
         const tokenBAmount = AddLiquidityTokenB.value.trim();
+        
+        if (!tokenAAmount || !tokenBAmount) {
+            throw new Error("Заполните оба поля");
+        }
 
-        // 2. Конвертация с учетом decimals
+        // 2. Конвертация в BigNumber с учетом decimals
         const tokenAAmountBN = parseUnits(tokenAAmount, 18);
         const tokenBAmountBN = parseUnits(tokenBAmount, 18);
 
-        // 3. Проверка балансов
-        const balanceA = await firstTokenContract.balanceOf(user_address);
-        const balanceB = await secondTokenContract.balanceOf(user_address);
+        // 3. Проверка балансов пользователя
+        const [balanceA, balanceB] = await Promise.all([
+            firstTokenContract.balanceOf(user_address),
+            secondTokenContract.balanceOf(user_address)
+        ]);
+
+        console.log(formatUnits(balanceA, 18), formatUnits(balanceB, 18));
         
-        console.log("Балансы:", {
-            tokenA: formatUnits(balanceA, 18),
-            tokenB: formatUnits(balanceB, 18)
-        });
-
-        // 4. Одобрения с обработкой ошибок
-        const approveTokenA = await firstTokenContract.approve(
-            PoolAddress, 
-            tokenAAmountBN, 
-            {gasLimit: 500000}
-        );
-        const receiptA = await approveTokenA.wait();
-        console.log("Approval A Status:", receiptA.status);
-
-        const approveTokenB = await secondTokenContract.approve(
-            PoolAddress, 
-            tokenBAmountBN, 
-            {gasLimit: 500000}
-        );
-        const receiptB = await approveTokenB.wait();
-        console.log("Approval B Status:", receiptB.status);
-
-        // 5. Симуляция вызова
-        try {
-            const simulated = await poolContract.addLiquidity.staticCall(
-                tokenAAmountBN,
-                tokenBAmountBN
-            );
-            console.log("Симуляция успешна:", simulated);
-        } catch (simError) {
-            console.error("Ошибка симуляции:", simError);
-            throw new Error(`Проверка не пройдена: ${simError.reason}`);
+        if (balanceA < tokenAAmountBN) {
+            throw new Error(`Недостаточно токенов A (баланс: ${formatUnits(balanceA, 18)})`);
+        }
+        if (balanceB < tokenBAmountBN) {
+            throw new Error(`Недостаточно токенов B (баланс: ${formatUnits(balanceB, 18)})`);
         }
 
-        // 6. Реальный вызов
+        // 4. Проверка и обновление разрешений
+        const checkAndApprove = async (tokenContract, amount) => {
+            const currentAllowance = await tokenContract.allowance(user_address, PoolAddress);
+            
+            if (currentAllowance < amount) {
+                console.log(`Обновление разрешения с ${formatUnits(currentAllowance, 18)} до ${formatUnits(amount, 18)}`);
+                const tx = await tokenContract.approve(
+                    PoolAddress,
+                    amount,
+                    { gasLimit: 500000 } // Увеличенный газ для надежности
+                );
+                await tx.wait(); // Ждем подтверждения
+                return true;
+            }
+            return false;
+        };
+
+        // Параллельная обработка разрешений
+        await Promise.all([
+            checkAndApprove(firstTokenContract, tokenAAmountBN),
+            checkAndApprove(secondTokenContract, tokenBAmountBN)
+        ]);
+
+        // 5. Симуляция вызова для проверки условий
+        try {
+            await poolContract.addLiquidity.staticCall(
+                tokenAAmountBN,
+                tokenBAmountBN,
+                { from: user_address } // Важно для корректной симуляции
+            );
+        } catch (simError) {
+            console.error("Симуляция провалена:", simError);
+            throw new Error(`Проверка условий не пройдена: ${simError.reason}`);
+        }
+
+        // 6. Реальный вызов с увеличенным газом
         const tx = await poolContract.addLiquidity(
             tokenAAmountBN,
             tokenBAmountBN,
             {
-                gasLimit: 2_000_000,
-                type: 2 // EIP-1559
+                gasLimit: 2_000_000, // Увеличенный лимит газа
+                type: 2 // EIP-1559 транзакция
             }
         );
         
         const receipt = await tx.wait();
-        console.log("Receipt:", receipt);
+        console.log("Транзакция успешна:", receipt.hash);
 
+        // 7. Обновление данных интерфейса
+        await updatePoolData();
         alert("Лидвидность успешно добавлена!");
 
     } catch (error) {
         console.error("Полная ошибка:", {
             message: error.message,
             reason: error.reason,
-            code: error.code,
             data: error.data
         });
         alert(`Ошибка: ${error.reason || error.message}`);
     }
 });
+
+// Функция обновления данных пула
+async function updatePoolData() {
+    try {
+        const [reserveA, reserveB, totalLiq, lpBalance] = await Promise.all([
+            poolContract.tokenAReserve(),
+            poolContract.tokenBReserve(),
+            poolContract.totalLiquidity(),
+            LPTokenContract.balanceOf(user_address)
+        ]);
+
+        totalLiquidity.textContent = formatUnits(totalLiq, 18);
+        firstTokenLiquidity.textContent = formatUnits(reserveA, 18);
+        secondTokenLiquidity.textContent = formatUnits(reserveB, 18);
+        LPTokenLiquidity.textContent = formatUnits(lpBalance, 18);
+
+    } catch (error) {
+        console.error("Ошибка обновления данных:", error);
+    }
+};
