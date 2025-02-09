@@ -64,27 +64,7 @@ contract Pool {
         }
     }
 
-function addLiquidity(uint256 amountTokenA, uint256 amountTokenB) public returns (bool) {
-    // Проверка allowance
-    require(
-        tokenA.allowance(msg.sender, address(this)) >= amountTokenA,
-        "Token A allowance too low"
-    );
-    require(
-        tokenB.allowance(msg.sender, address(this)) >= amountTokenB,
-        "Token B allowance too low"
-    );
-
-        // Проверка разрешений
-    // require(
-    //     IERC20(tokenA).allowance(msg.sender, address(this)) >= amountTokenA,
-    //     "Token A allowance too low"
-    // );
-    // require(
-    //     IERC20(tokenB).allowance(msg.sender, address(this)) >= amountTokenB,
-    //     "Token B allowance too low"
-    // );
-    
+function addLiquidity(uint256 amountTokenA, uint256 amountTokenB) public returns (bool) {    
     // Дополнительные проверки
     require(amountTokenA > 0 && amountTokenB > 0, "Zero amounts");
     require(
@@ -115,6 +95,7 @@ function addLiquidity(uint256 amountTokenA, uint256 amountTokenB) public returns
 
     // Минт LP-токенов
     LPtoken.mint(liquidity);
+    LPtoken.transfer(msg.sender, liquidity);
     
     // Обновление резервов
     tokenAReserve += amountTokenA;
